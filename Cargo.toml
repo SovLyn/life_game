@@ -1,0 +1,21 @@
+[package]
+name = "life_game"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bytemuck = "1.25.2"
+chrono = "0.4.45"
+eframe = { version = "0.36.1", features = ["wgpu", "wayland", "x11"] }
+egui = "0.36.1"
+egui-wgpu = "0.36.1"
+env_logger = "0.11.11"
+log = "0.4.33"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.77"
+wgpu = "30.0.1"
+
+# web-sys gives us access to browser APIs like window and document
+[dependencies.web-sys]
+version = "0.3"
+features = ["Window", "Document", "HtmlElement", "Node", "Element"]
