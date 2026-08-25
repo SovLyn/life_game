@@ -34,32 +34,43 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // 加速度清零
     particles[index].acceleration = vec2f(0.0, 0.0);
 
-    // 粘度
-    particles[index].velocity *= params.alpha;
-
-    // 计算加速度：如果在inner_range内，强烈排斥，否则依照acc_matrix计算
+    // 原版语义（hunar4321/particle-life）：
+    //   力 = 单位方向向量 × acc_matrix[自己][对方]，大小恒定，距离只作门限。
+    //   正值 = 指向对方（吸引），负值 = 背离对方（排斥）。
+    //   原版没有碰撞检测，粒子允许重叠，靠粘性阻尼稳定，因此这里不做任何位置瞬移。
     for (var i: u32 = 0; i < arrayLength(&particles); i++) {
         if (i == index) {
             continue;
         }
 
-        let r = distance(particles[index].position, particles[i].position);
+        let dir = particles[i].position - particles[index].position;
+        let dist2 = dot(dir, dir);
 
-        if (r>= params.outer_range || r < 0.001) {
+        // 距离为 0 或超出作用半径则忽略
+        if (dist2 < 0.000001 || dist2 >= params.outer_range * params.outer_range) {
             continue;
         }
 
+        let dist = sqrt(dist2);
         let other_type = particles[i].flag & 0x00000007;
 
-        if (r < params.inner_range) {
-            particles[index].position += normalize(particles[i].position - particles[index].position) * params.inner_range;
+        if (dist < params.inner_range) {
+            // 内核软排斥力（替代原来的位置瞬移）：
+            // 距离越近越强，在 inner_range 处衰减为 0，与外侧恒力平滑衔接。
+            // 只负责"别重叠"，仍通过加速度积分，动量守恒、无突跳。
+            let strength = params.inner_range * (1.0 - dist / params.inner_range);
+            particles[index].acceleration -= dir / dist * strength;
         } else {
-            particles[index].acceleration += normalize(particles[i].position - particles[index].position) * params.acc_matrix[other_type * 5 + p_type];
+            // 恒力：规则值 [自己][对方]
+            let g = params.acc_matrix[p_type * 5 + other_type];
+            particles[index].acceleration += dir / dist * g;
         }
     }
 
     // 更新速度和位置
-    particles[index].velocity += 10.0 * (particles[index].acceleration * params.delta_time);
+    // 粘性阻尼（原版 v = (v + f) * (1 - viscosity) 的等价形式）
+    particles[index].velocity *= params.alpha;
+    particles[index].velocity += 1000.0 * (particles[index].acceleration * params.delta_time);
     particles[index].position += particles[index].velocity * params.delta_time;
 
     // 边界反弹，边界为0.0到1000.0，render中会映射回-1.0到1.0

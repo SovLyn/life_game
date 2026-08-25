@@ -11,7 +11,6 @@ pub struct LifeGameSimulator {
     sim_param_buffer: wgpu::Buffer,
     compute_pipeline: wgpu::ComputePipeline,
     compute_bind_group: wgpu::BindGroup,
-    bind_group_layout: wgpu::BindGroupLayout,
 }
 
 impl LifeGameSimulator {
@@ -27,7 +26,7 @@ impl LifeGameSimulator {
     fn initialize_patticles(n: usize, c: usize) -> Vec<Vertex> {
         (0..n)
             .map(|_| {
-                let cla = (random() * c as f64).ceil() as usize;
+                let cla = (random() * c as f64).floor() as usize;
 
                 Vertex {
                     position: [1000.0 * random() as f32, 1000.0 * random() as f32],
@@ -131,7 +130,6 @@ impl LifeGameSimulator {
             sim_param_buffer,
             compute_pipeline,
             compute_bind_group,
-            bind_group_layout,
         }
     }
 
@@ -164,4 +162,5 @@ impl LifeGameSimulator {
     pub fn get_particle_num(&self) -> u32 {
         self.particle_num
     }
+
 }

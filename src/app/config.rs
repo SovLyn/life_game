@@ -1,11 +1,14 @@
 use web_sys::js_sys::Math::random;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Config {
     pub inner_range: f32,
     pub outer_range: f32,
     pub alpha: f32,
     pub acc_matrix: [f32; 25],
+    pub cla: usize, 
+    pub particle_num: usize,
 }
 
 impl Default for Config {
@@ -19,6 +22,8 @@ impl Default for Config {
             outer_range: 50.0,
             alpha: 0.8,
             acc_matrix,
+            cla: 3,
+            particle_num: 1000,
         }
     }
 }

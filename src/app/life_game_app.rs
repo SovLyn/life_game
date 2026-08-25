@@ -1,3 +1,4 @@
+use eframe::Storage;
 use egui::{Pos2, Rect, Vec2};
 
 use super::frame_rate::FrameRate;
@@ -22,6 +23,12 @@ pub struct LifeGameApp {
 impl LifeGameApp {
     // 构造函数，用于创建LifeGameApp实例
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let config = if let Some(storage) = cc.storage {
+            eframe::get_value(storage, "life_game_config").unwrap_or_default()
+        } else {
+            Config::new()
+        };
+
         // 获取wgpu渲染状态
         let wgpu_render_state = cc
             .wgpu_render_state
@@ -31,13 +38,13 @@ impl LifeGameApp {
 
         let device = &wgpu_render_state.device;
 
-        let simulator = LifeGameSimulator::new(device, 2000, 3);
+        let simulator = LifeGameSimulator::new(device, config.particle_num, config.cla);
 
         // 创建并返回LifeGameApp实例
         Self {
             render: LifeGameRenderer::new(device, &surface_format),
             simulator,
-            config: Config::new(),
+            config,
             wgpu_render_state: wgpu_render_state.clone(),
             frame_rate: FrameRate::new(100),
             last_frame_time: chrono::offset::Utc::now().timestamp_micros(),
@@ -96,6 +103,17 @@ impl LifeGameApp {
     fn draw_ui(&mut self, ui: &mut egui::Ui) {
         ui.add(egui::Slider::new(&mut self.config.inner_range, 1.0..=5.0).text("inner range"));
         ui.add(egui::Slider::new(&mut self.config.outer_range, 5.0..=100.0).text("outer range"));
+        ui.add(egui::Slider::new(&mut self.config.alpha, 0.0..=1.0).text("alpha"));
+        ui.separator();
+        ui.add(egui::Slider::new(&mut self.config.particle_num, 256..=8192).text("particle num"));
+        ui.add(egui::Slider::new(&mut self.config.cla, 1..=5).text("particle classes"));
+        if ui.button("Renew").clicked() {
+            self.simulator = LifeGameSimulator::new(
+                &self.wgpu_render_state.device,
+                self.config.particle_num,
+                self.config.cla,
+            );
+        }
         ui.separator();
         ui.label(format!("fps: {}", self.frame_rate.get_fps()));
     }
@@ -110,6 +128,10 @@ impl eframe::App for LifeGameApp {
             self.draw(ui);
         });
         ui.request_repaint();
+    }
+
+    fn save(&mut self, storage: &mut dyn Storage) {
+        eframe::set_value(storage, "life_game_config", &self.config);
     }
 
     fn on_exit(&mut self) {}
