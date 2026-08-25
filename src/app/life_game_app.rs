@@ -120,7 +120,7 @@ impl LifeGameApp {
         ui.add(egui::Slider::new(&mut self.config.outer_range, 5.0..=100.0).text("outer range"));
         ui.add(egui::Slider::new(&mut self.config.alpha, 0.0..=1.0).text("alpha"));
         ui.separator();
-        ui.add(egui::Slider::new(&mut self.config.particle_num, 256..=8192).text("particle num"));
+        ui.add(egui::Slider::new(&mut self.config.particle_num, 256..=16384).text("particle num"));
         ui.add(egui::Slider::new(&mut self.config.cla, 1..=5).text("particle classes"));
         if ui.button("Renew").clicked() {
             self.simulator = LifeGameSimulator::new(

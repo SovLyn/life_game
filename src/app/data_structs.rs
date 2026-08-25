@@ -60,3 +60,12 @@ pub struct SimParams {
     // 与 compute.wgsl 的 array<vec4f,25> 逐字节对齐；每个 [f32;4] 的 .x 存有效值。
     pub acc_matrix: [[f32; 4]; 25],
 }
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct GridParams {
+    pub grid_w: u32,
+    pub grid_h: u32,
+    pub cell_size: f32,
+    pub particle_num: u32,
+}
