@@ -1,17 +1,13 @@
-use web_sys::js_sys::Math::random;
-use wgpu::util::DeviceExt;
-
 use super::data_structs::Vertex;
 
 pub struct LifeGameRenderer {
     pub render_pipeline: wgpu::RenderPipeline,
-    pub vertex_buffer: wgpu::Buffer,
 }
 
 impl LifeGameRenderer {
     pub fn new(device: &wgpu::Device, surface_format: &wgpu::TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shader"),
+            label: Some("Render Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader/render.wgsl").into()),
         });
         let render_pipeline_layout =
@@ -54,23 +50,6 @@ impl LifeGameRenderer {
             cache: None,
         });
 
-        let random_vertices: Vec<Vertex> = (0..500)
-            .map(|_| Vertex {
-                position: [random() as f32 * 2.0 - 1.0, random() as f32 * 2.0 - 1.0],
-                color: [random() as f32, random() as f32, random() as f32],
-            })
-            .collect();
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            // 将顶点数据转换为字节切片
-            contents: bytemuck::cast_slice(&random_vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        Self {
-            render_pipeline,
-            vertex_buffer,
-        }
+        Self { render_pipeline }
     }
 }

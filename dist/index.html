@@ -8,8 +8,8 @@
     <!-- Tell Trunk to compile the main Rust binary target into WASM -->
     
 <script type="module">
-import init, * as bindings from '/life_game-9da3eda1eb325374.js';
-const wasm = await init({ module_or_path: '/life_game-9da3eda1eb325374_bg.wasm' });
+import init, * as bindings from '/life_game-44422faac53f0c4b.js';
+const wasm = await init({ module_or_path: '/life_game-44422faac53f0c4b_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -20,7 +20,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 </script>
     <!-- MUST add data-trunk, otherwise trunk will will not deal with it -->
     <link rel="stylesheet" href="/style-222d948ead023fc4.css" integrity="sha384-6zKFzDe9I8kwBDGrjPZu2QyQXK7xc66l1aShXF4yX26ylmiP1H76xYTk96BB92Yr"/>
-<link rel="modulepreload" href="/life_game-9da3eda1eb325374.js" crossorigin="anonymous" integrity="sha384-S5Anr4KzxpAIk2gUau9ifiZbk08XYsuN2OtGa1+LVzfwOGndETy54M9Djhz05tRn"><link rel="preload" href="/life_game-9da3eda1eb325374_bg.wasm" crossorigin="anonymous" integrity="sha384-iKQ3Q34rRYsUc97TpnFhCVpxw29ptUUsyAXKMuMU5GhRiEOVtuoVSLveYKFcc2Gi" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/life_game-44422faac53f0c4b.js" crossorigin="anonymous" integrity="sha384-bx9PpkLNEmsGrep7bIQhuuFYAtDlDIFrSjmp6aLGo4IjN4Q/w1ph90qsZU000sed"><link rel="preload" href="/life_game-44422faac53f0c4b_bg.wasm" crossorigin="anonymous" integrity="sha384-/mLA7E+ZO6OPQ92UFqRxE+hotmcQEenr7Arrp8HbwWPwmWSQH0bcNgLc3ytGIHOW" as="fetch" type="application/wasm"></head>
 
 <body>
     <canvas id="main_port"></canvas>

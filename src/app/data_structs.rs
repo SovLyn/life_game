@@ -1,9 +1,20 @@
 #[repr(C)]
-// Pod 表示 Vertex 是 "Plain Old Data" 数据类型，因此可以被解释为 &[u8] 类型。Zeroable 表示可以对其使用 core::mem::zeroed()
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+// 布局说明（必须与 compute.wgsl 中的 struct Particle 完全一致，否则
+// compute 与 render 读写同一缓冲区时元素 stride 会错位）
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct Vertex {
     pub position: [f32; 2],
+    pub velocity: [f32; 2],
+    pub acceleration: [f32; 2],
+    // 3bit: type;
+    // 1bit: is_discarded;
+    pub flag: u32,
+    pub _padding: u32,
+    // vec3f 要求 16 字节对齐，从 32 开始
     pub color: [f32; 3],
+    // 尾部 4 字节：WGSL 中结构体大小取整到 16 的倍数（48 字节），
+    // 这里显式占位，避免 bytemuck::Pod 因隐藏 padding 报错
+    pub _pad_tail: u32,
 }
 
 impl Vertex {
@@ -15,14 +26,41 @@ impl Vertex {
                 wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
                     offset: core::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                     shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: core::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: core::mem::size_of::<[f32; 6]>() as wgpu::BufferAddress,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Uint32,
+                },
+                wgpu::VertexAttribute {
+                    offset: (core::mem::size_of::<[f32; 6]>()
+                        + core::mem::size_of::<u32>()
+                        + core::mem::size_of::<u32>()) as wgpu::BufferAddress,
+                    shader_location: 4,
                     format: wgpu::VertexFormat::Float32x3,
                 },
             ],
         }
     }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct SimParams {
+    pub inner_range: f32,
+    pub outer_range: f32,
+    pub delta_time: f32,
+    pub alpha: f32,
+    pub acc_matrix: [f32; 25],
 }

@@ -1,14 +1,22 @@
 use egui::{Pos2, Rect, Vec2};
 
+use super::frame_rate::FrameRate;
+
+use super::data_structs::SimParams;
+
+use super::life_game_simulator::LifeGameSimulator;
+
 use super::config::Config;
 use super::life_game_renderer::LifeGameRenderer;
 use super::render_callback::RenderCallback;
 // 定义LifeGameApp结构体，用于管理生命游戏的显示和交互
 pub struct LifeGameApp {
     render: LifeGameRenderer,
-    // 游戏配置，包含各种参数
+    simulator: LifeGameSimulator,
     config: Config,
-    surface_format: wgpu::TextureFormat,
+    wgpu_render_state: egui_wgpu::RenderState,
+    frame_rate: FrameRate,
+    last_frame_time: i64,
 }
 
 impl LifeGameApp {
@@ -22,11 +30,17 @@ impl LifeGameApp {
         let surface_format = wgpu_render_state.target_format;
 
         let device = &wgpu_render_state.device;
+
+        let simulator = LifeGameSimulator::new(device, 2000, 3);
+
         // 创建并返回LifeGameApp实例
         Self {
             render: LifeGameRenderer::new(device, &surface_format),
+            simulator,
             config: Config::new(),
-            surface_format,
+            wgpu_render_state: wgpu_render_state.clone(),
+            frame_rate: FrameRate::new(100),
+            last_frame_time: chrono::offset::Utc::now().timestamp_micros(),
         }
     }
 
@@ -43,23 +57,54 @@ impl LifeGameApp {
         );
         let _response = ui.allocate_rect(rect, egui::Sense::drag());
 
+        let params = self.get_params();
+        let queue = &self.wgpu_render_state.queue;
+        let device = &self.wgpu_render_state.device;
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Particle Update Encoder"),
+        });
+
+        self.simulator.update(device, queue, &mut encoder, &params);
+        // 提交计算命令，否则计算管线永远不会在 GPU 上执行，粒子位置保持不变
+        queue.submit([encoder.finish()]);
+
         let callback_obj = RenderCallback {
             render_pipeline: self.render.render_pipeline.clone(),
-            vertex_buffer: self.render.vertex_buffer.clone(),
-            vertex_num: 500,
+            vertex_buffer: self.simulator.get_particle_buffer().clone(),
+            vertex_num: self.simulator.get_particle_num(),
         };
 
         let callback = egui_wgpu::Callback::new_paint_callback(rect, callback_obj);
         ui.painter().add(callback);
+    }
+
+    fn get_params(&mut self) -> SimParams {
+        let current_time = chrono::offset::Utc::now().timestamp_micros();
+        let delta_time = (current_time - self.last_frame_time) as f32 / 1_000_000.;
+        self.last_frame_time = current_time;
+        self.frame_rate.add(current_time as f64 / 1_000_000.);
+        SimParams {
+            inner_range: self.config.inner_range,
+            outer_range: self.config.outer_range,
+            delta_time,
+            alpha: self.config.alpha,
+            acc_matrix: self.config.acc_matrix,
+            ..Default::default()
+        }
+    }
+
+    fn draw_ui(&mut self, ui: &mut egui::Ui) {
+        ui.add(egui::Slider::new(&mut self.config.inner_range, 1.0..=5.0).text("inner range"));
+        ui.add(egui::Slider::new(&mut self.config.outer_range, 5.0..=100.0).text("outer range"));
+        ui.separator();
+        ui.label(format!("fps: {}", self.frame_rate.get_fps()));
     }
 }
 
 impl eframe::App for LifeGameApp {
     fn ui(&mut self, ui: &mut eframe::egui::Ui, _frame: &mut eframe::Frame) {
         egui::Window::new("Control Panel").show(ui.ctx(), |ui| {
-            ui.add(
-                egui::Slider::new(&mut self.config.point_size, 0.0..=100.0).text("particle size"),
-            );
+            self.draw_ui(ui);
         });
         egui::Frame::canvas(ui.style()).show(ui, |ui| {
             self.draw(ui);

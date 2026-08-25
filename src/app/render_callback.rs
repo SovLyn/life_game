@@ -28,8 +28,8 @@ impl CallbackTrait for RenderCallback {
         render_pass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &CallbackResources,
     ) {
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.draw(0..self.vertex_num, 0..1);
     }
 }
