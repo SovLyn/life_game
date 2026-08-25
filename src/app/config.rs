@@ -13,15 +13,11 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        let mut acc_matrix: [f32; 25] = [0.0; 25];
-        for i in 0..25 {
-            acc_matrix[i] = (random() * 2.0 - 1.0) as f32 * 0.4;
-        }
         Self {
             inner_range: 4.0,
             outer_range: 50.0,
             alpha: 0.8,
-            acc_matrix,
+            acc_matrix: Self::random_matrix(),
             cla: 3,
             particle_num: 1000,
         }
@@ -31,5 +27,18 @@ impl Default for Config {
 impl Config {
     pub fn new() -> Config {
         Self::default()
+    }
+
+    fn random_matrix() -> [f32; 25] {
+        let mut m = [0.0f32; 25];
+        for v in m.iter_mut() {
+            *v = (random() * 2.0 - 1.0) as f32 * 0.4;
+        }
+        m
+    }
+
+    // 重新随机生成整个相互作用矩阵（值域 [-0.4, 0.4]，与默认初始化一致）
+    pub fn randomize_matrix(&mut self) {
+        self.acc_matrix = Self::random_matrix();
     }
 }

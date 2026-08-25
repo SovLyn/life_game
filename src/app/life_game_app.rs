@@ -18,6 +18,7 @@ pub struct LifeGameApp {
     wgpu_render_state: egui_wgpu::RenderState,
     frame_rate: FrameRate,
     last_frame_time: i64,
+    current_cla: usize,
 }
 
 impl LifeGameApp {
@@ -48,6 +49,7 @@ impl LifeGameApp {
             wgpu_render_state: wgpu_render_state.clone(),
             frame_rate: FrameRate::new(100),
             last_frame_time: chrono::offset::Utc::now().timestamp_micros(),
+            current_cla: config.cla
         }
     }
 
@@ -113,9 +115,140 @@ impl LifeGameApp {
                 self.config.particle_num,
                 self.config.cla,
             );
+            self.current_cla = self.config.cla;
         }
         ui.separator();
+        self.draw_matrix_ui(ui);
+        ui.separator();
         ui.label(format!("fps: {}", self.frame_rate.get_fps()));
+    }
+
+    // 绘制 5×5 的相互作用矩阵：行=自己、列=对方，与 compute.wgsl 的
+    // acc_matrix[p_type * 5 + other_type] 索引保持一致。
+    // 有效格子数为 current_cla × current_cla，超出的行列渲染为灰色且不可交互。
+    // 滚动滚轮以 0.01 为步长在 [-1, 1] 区间内修改对应矩阵项，实时写回 config。
+    fn draw_matrix_ui(&mut self, ui: &mut egui::Ui) {
+        ui.label("Attraction Matrix (row = self, col = other)");
+        if ui.button("Randomize Matrix").clicked() {
+            self.config.randomize_matrix();
+        }
+
+        let cell = egui::vec2(46.0, 30.0);
+        let gap = 4.0;
+        let grid_size = egui::vec2(
+            5.0 * cell.x + 4.0 * gap,
+            5.0 * cell.y + 4.0 * gap,
+        );
+
+        // 一次性占位整块网格区域，后续画在这个 rect 内
+        let (grid_rect, _) = ui.allocate_exact_size(grid_size, egui::Sense::hover());
+        let painter = ui.painter();
+        let hover_pos = ui.ctx().pointer_hover_pos();
+
+        // 先统计本次帧滚轮的"步数"（一格滚轮 = 1 步 = 0.01）
+        let mut wheel_steps = 0.0f32;
+        ui.ctx().input(|i| {
+            for e in &i.events {
+                if let egui::Event::MouseWheel { unit, delta, .. } = e {
+                    wheel_steps += match unit {
+                        egui::MouseWheelUnit::Point => delta.y / 50.0,
+                        egui::MouseWheelUnit::Line => delta.y,
+                        egui::MouseWheelUnit::Page => delta.y * 4.0,
+                    };
+                }
+            }
+        });
+
+        // 找出当前悬停的格子（若在有效区域内）
+        let mut hovered_idx: Option<usize> = None;
+        if let Some(p) = hover_pos {
+            if grid_rect.contains(p) {
+                let col = ((p.x - grid_rect.min.x) / (cell.x + gap)).floor() as i32;
+                let row = ((p.y - grid_rect.min.y) / (cell.y + gap)).floor() as i32;
+                if (0..5).contains(&row) && (0..5).contains(&col) {
+                    let r = row as usize;
+                    let c = col as usize;
+                    if r < self.current_cla && c < self.current_cla {
+                        hovered_idx = Some(r * 5 + c);
+                    }
+                }
+            }
+        }
+
+        // 应用滚轮修改
+        if wheel_steps != 0.0 {
+            if let Some(idx) = hovered_idx {
+                let v = &mut self.config.acc_matrix[idx];
+                *v = (*v + wheel_steps * 0.01).clamp(-1.0, 1.0);
+            }
+        }
+
+        // 逐个绘制格子
+        for row in 0..5 {
+            for col in 0..5 {
+                let idx = row * 5 + col;
+                let active = row < self.current_cla && col < self.current_cla;
+                let hovered = hovered_idx == Some(idx);
+                let val = self.config.acc_matrix[idx];
+
+                let min = grid_rect.min
+                    + egui::vec2(
+                        col as f32 * (cell.x + gap),
+                        row as f32 * (cell.y + gap),
+                    );
+                let cell_rect = egui::Rect::from_min_size(min, cell);
+
+                // 热力图：按值正负/强弱插值填充底色
+                // 正值（吸引）→ 暖橙红；负值（排斥）→ 冷蓝；0 → 中性深灰
+                let fill = if !active {
+                    egui::Color32::from_gray(55)
+                } else {
+                    let t = val.clamp(-1.0, 1.0).abs();
+                    let neutral = 35.0f32;
+                    let (tr, tg, tb) = if val >= 0.0 {
+                        (210.0f32, 90.0, 40.0) // 暖
+                    } else {
+                        (50.0f32, 110.0, 220.0) // 冷
+                    };
+                    let r = neutral + (tr - neutral) * t;
+                    let g = neutral + (tg - neutral) * t;
+                    let b = neutral + (tb - neutral) * t;
+                    egui::Color32::from_rgb(r as u8, g as u8, b as u8)
+                };
+
+                // 文字颜色按底色亮度切换，保证可读性
+                let text_color = if !active {
+                    egui::Color32::from_gray(130)
+                } else {
+                    let lum = (fill.r() as u32 + fill.g() as u32 + fill.b() as u32) / 3;
+                    if lum > 130 {
+                        egui::Color32::from_gray(20)
+                    } else {
+                        egui::Color32::WHITE
+                    }
+                };
+
+                let stroke = if hovered {
+                    egui::Stroke::new(2.0, egui::Color32::from_rgb(235, 180, 60))
+                } else if !active {
+                    egui::Stroke::new(1.0, egui::Color32::from_gray(70))
+                } else {
+                    egui::Stroke::new(1.0, egui::Color32::from_gray(90))
+                };
+
+                painter.rect_filled(cell_rect, 3.0, fill);
+                painter.rect_stroke(cell_rect, 3.0, stroke, egui::StrokeKind::Inside);
+
+                let text = format!("{:+.2}", val);
+                painter.text(
+                    cell_rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    text,
+                    egui::FontId::monospace(13.0),
+                    text_color,
+                );
+            }
+        }
     }
 }
 
