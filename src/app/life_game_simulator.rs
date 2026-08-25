@@ -14,15 +14,6 @@ pub struct LifeGameSimulator {
 }
 
 impl LifeGameSimulator {
-    const COLOR_MAP: [[f32; 3]; 6] = [
-        [0., 0., 1.],
-        [0., 1., 0.],
-        [1., 0., 0.],
-        [1., 1., 0.],
-        [0., 1., 1.],
-        [1., 0., 1.],
-    ];
-
     fn initialize_patticles(n: usize, c: usize) -> Vec<Vertex> {
         (0..n)
             .map(|_| {
@@ -31,7 +22,6 @@ impl LifeGameSimulator {
                 Vertex {
                     position: [1000.0 * random() as f32, 1000.0 * random() as f32],
                     velocity: [0., 0.],
-                    color: Self::COLOR_MAP[cla],
                     flag: cla as _,
                     ..Default::default()
                 }
@@ -162,5 +152,4 @@ impl LifeGameSimulator {
     pub fn get_particle_num(&self) -> u32 {
         self.particle_num
     }
-
 }

@@ -1,5 +1,6 @@
 use eframe::Storage;
 use egui::{Pos2, Rect, Vec2};
+use web_sys::js_sys::Math::random;
 
 use super::frame_rate::FrameRate;
 
@@ -43,7 +44,7 @@ impl LifeGameApp {
 
         // 创建并返回LifeGameApp实例
         Self {
-            render: LifeGameRenderer::new(device, &surface_format),
+            render: LifeGameRenderer::new(device, &surface_format, &config.colors),
             simulator,
             config,
             wgpu_render_state: wgpu_render_state.clone(),
@@ -74,12 +75,19 @@ impl LifeGameApp {
         });
 
         self.simulator.update(device, queue, &mut encoder, &params);
+        // 每帧把最新的颜色数组写回 GPU uniform buffer，使颜色编辑实时生效
+        queue.write_buffer(
+            &self.render.color_array_buffer,
+            0,
+            bytemuck::cast_slice(&self.config.colors),
+        );
         // 提交计算命令，否则计算管线永远不会在 GPU 上执行，粒子位置保持不变
         queue.submit([encoder.finish()]);
 
         let callback_obj = RenderCallback {
             render_pipeline: self.render.render_pipeline.clone(),
             vertex_buffer: self.simulator.get_particle_buffer().clone(),
+            color_array_bind_group: self.render.color_array_bind_group.clone(),
             vertex_num: self.simulator.get_particle_num(),
         };
 
@@ -117,6 +125,37 @@ impl LifeGameApp {
             );
             self.current_cla = self.config.cla;
         }
+
+        // 每类粒子一个颜色选择器（只显示当前粒子类数个）
+        ui.separator();
+        if ui.button("Randomize Colors").clicked() {
+            for c in self.config.colors[..self.current_cla].iter_mut() {
+                c[0] = random() as f32;
+                c[1] = random() as f32;
+                c[2] = random() as f32;
+                c[3] = 1.0;
+            }
+        }
+        for i in 0..self.current_cla {
+            let c = self.config.colors[i];
+            let mut c32 = egui::Color32::from_rgba_unmultiplied(
+                (c[0] * 255.0) as u8,
+                (c[1] * 255.0) as u8,
+                (c[2] * 255.0) as u8,
+                (c[3] * 255.0) as u8,
+            );
+            ui.horizontal(|ui| {
+                ui.label(format!("particle {}", i));
+                if ui.color_edit_button_srgba(&mut c32).changed() {
+                    self.config.colors[i] = [
+                        c32.r() as f32 / 255.0,
+                        c32.g() as f32 / 255.0,
+                        c32.b() as f32 / 255.0,
+                        c32.a() as f32 / 255.0,
+                    ];
+                }
+            });
+        }
         ui.separator();
         self.draw_matrix_ui(ui);
         ui.separator();
@@ -135,15 +174,25 @@ impl LifeGameApp {
 
         let cell = egui::vec2(46.0, 30.0);
         let gap = 4.0;
+        // 行列标签色块的尺寸（行标签列宽 / 列标签行高）
+        let label_size = 18.0;
         let grid_size = egui::vec2(
             5.0 * cell.x + 4.0 * gap,
             5.0 * cell.y + 4.0 * gap,
         );
+        // 整体区域 = 左侧行标签列 + 顶部列标签行 + 网格本体
+        let total_size = egui::vec2(
+            label_size + gap + grid_size.x,
+            label_size + gap + grid_size.y,
+        );
 
-        // 一次性占位整块网格区域，后续画在这个 rect 内
-        let (grid_rect, _) = ui.allocate_exact_size(grid_size, egui::Sense::hover());
+        // 一次性占位整块区域，后续画在这个 rect 内
+        let (grid_rect, _) = ui.allocate_exact_size(total_size, egui::Sense::hover());
         let painter = ui.painter();
         let hover_pos = ui.ctx().pointer_hover_pos();
+
+        // 网格本体（5×5 格子）的原点：跳过标签区
+        let grid_origin = grid_rect.min + egui::vec2(label_size + gap, label_size + gap);
 
         // 先统计本次帧滚轮的"步数"（一格滚轮 = 1 步 = 0.01）
         let mut wheel_steps = 0.0f32;
@@ -162,9 +211,11 @@ impl LifeGameApp {
         // 找出当前悬停的格子（若在有效区域内）
         let mut hovered_idx: Option<usize> = None;
         if let Some(p) = hover_pos {
-            if grid_rect.contains(p) {
-                let col = ((p.x - grid_rect.min.x) / (cell.x + gap)).floor() as i32;
-                let row = ((p.y - grid_rect.min.y) / (cell.y + gap)).floor() as i32;
+            let gx = p.x - grid_origin.x;
+            let gy = p.y - grid_origin.y;
+            if gx >= 0.0 && gy >= 0.0 && gx < grid_size.x && gy < grid_size.y {
+                let col = (gx / (cell.x + gap)).floor() as i32;
+                let row = (gy / (cell.y + gap)).floor() as i32;
                 if (0..5).contains(&row) && (0..5).contains(&col) {
                     let r = row as usize;
                     let c = col as usize;
@@ -183,6 +234,43 @@ impl LifeGameApp {
             }
         }
 
+        // 绘制顶部列标签 + 左侧行标签（色块表示对应粒子类型的颜色）
+        let type_color = |t: usize| -> egui::Color32 {
+            let c = self.config.colors[t];
+            egui::Color32::from_rgba_unmultiplied(
+                (c[0] * 255.0) as u8,
+                (c[1] * 255.0) as u8,
+                (c[2] * 255.0) as u8,
+                (c[3] * 255.0) as u8,
+            )
+        };
+        for col in 0..5 {
+            let r = egui::Rect::from_min_size(
+                grid_origin + egui::vec2(col as f32 * (cell.x + gap), -(label_size + gap)),
+                egui::vec2(cell.x, label_size),
+            );
+            let fill = if col < self.current_cla {
+                type_color(col)
+            } else {
+                egui::Color32::from_gray(55)
+            };
+            painter.rect_filled(r, 3.0, fill);
+            painter.rect_stroke(r, 3.0, egui::Stroke::new(1.0, egui::Color32::from_gray(90)), egui::StrokeKind::Inside);
+        }
+        for row in 0..5 {
+            let r = egui::Rect::from_min_size(
+                grid_origin + egui::vec2(-(label_size + gap), row as f32 * (cell.y + gap)),
+                egui::vec2(label_size, cell.y),
+            );
+            let fill = if row < self.current_cla {
+                type_color(row)
+            } else {
+                egui::Color32::from_gray(55)
+            };
+            painter.rect_filled(r, 3.0, fill);
+            painter.rect_stroke(r, 3.0, egui::Stroke::new(1.0, egui::Color32::from_gray(90)), egui::StrokeKind::Inside);
+        }
+
         // 逐个绘制格子
         for row in 0..5 {
             for col in 0..5 {
@@ -191,7 +279,7 @@ impl LifeGameApp {
                 let hovered = hovered_idx == Some(idx);
                 let val = self.config.acc_matrix[idx];
 
-                let min = grid_rect.min
+                let min = grid_origin
                     + egui::vec2(
                         col as f32 * (cell.x + gap),
                         row as f32 * (cell.y + gap),

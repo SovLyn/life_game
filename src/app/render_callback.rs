@@ -4,6 +4,7 @@ use egui_wgpu::{CallbackResources, CallbackTrait};
 pub struct RenderCallback {
     pub render_pipeline: wgpu::RenderPipeline,
     pub vertex_buffer: wgpu::Buffer,
+    pub color_array_bind_group: wgpu::BindGroup,
     pub vertex_num: u32,
 }
 
@@ -30,6 +31,7 @@ impl CallbackTrait for RenderCallback {
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_bind_group(0, &self.color_array_bind_group, &[]);
         render_pass.draw(0..self.vertex_num, 0..1);
     }
 }

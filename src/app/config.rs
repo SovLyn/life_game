@@ -1,5 +1,5 @@
-use web_sys::js_sys::Math::random;
 use serde::{Deserialize, Serialize};
+use web_sys::js_sys::Math::random;
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Config {
@@ -7,8 +7,9 @@ pub struct Config {
     pub outer_range: f32,
     pub alpha: f32,
     pub acc_matrix: [f32; 25],
-    pub cla: usize, 
+    pub cla: usize,
     pub particle_num: usize,
+    pub colors: [[f32; 4]; 5],
 }
 
 impl Default for Config {
@@ -20,6 +21,13 @@ impl Default for Config {
             acc_matrix: Self::random_matrix(),
             cla: 3,
             particle_num: 1000,
+            colors: [
+                [1., 1., 0., 1.],
+                [1., 0., 1., 1.],
+                [0., 1., 1., 1.],
+                [1., 0., 0., 1.],
+                [0., 0., 1., 1.],
+            ],
         }
     }
 }

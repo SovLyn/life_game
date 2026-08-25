@@ -10,11 +10,6 @@ pub struct Vertex {
     // 1bit: is_discarded;
     pub flag: u32,
     pub _padding: u32,
-    // vec3f 要求 16 字节对齐，从 32 开始
-    pub color: [f32; 3],
-    // 尾部 4 字节：WGSL 中结构体大小取整到 16 的倍数（48 字节），
-    // 这里显式占位，避免 bytemuck::Pod 因隐藏 padding 报错
-    pub _pad_tail: u32,
 }
 
 impl Vertex {
@@ -44,11 +39,10 @@ impl Vertex {
                     format: wgpu::VertexFormat::Uint32,
                 },
                 wgpu::VertexAttribute {
-                    offset: (core::mem::size_of::<[f32; 6]>()
-                        + core::mem::size_of::<u32>()
-                        + core::mem::size_of::<u32>()) as wgpu::BufferAddress,
+                    offset: (core::mem::size_of::<[f32; 6]>() + core::mem::size_of::<u32>())
+                        as wgpu::BufferAddress,
                     shader_location: 4,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Uint32,
                 },
             ],
         }
