@@ -11,7 +11,8 @@ struct SimParams {
     outer_range: f32,
     delta_time: f32,
     alpha: f32,
-    acc_matrix: array<f32, 25>,
+    // uniform 数组元素 stride=16，用 vec4f 打包（值在 .x），与 Rust 的 [[f32;4];25] 对齐
+    acc_matrix: array<vec4f, 25>,
 }
 
 @group(0) @binding(0)
@@ -59,7 +60,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             particles[index].acceleration -= dir / dist * strength;
         } else {
             // 恒力：规则值 [自己][对方]
-            let g = params.acc_matrix[p_type * 5 + other_type];
+            let g = params.acc_matrix[p_type * 5 + other_type].x;
             particles[index].acceleration += dir / dist * g;
         }
     }

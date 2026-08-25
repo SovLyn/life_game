@@ -100,12 +100,17 @@ impl LifeGameApp {
         let delta_time = (current_time - self.last_frame_time) as f32 / 1_000_000.;
         self.last_frame_time = current_time;
         self.frame_rate.add(current_time as f64 / 1_000_000.);
+        // 把 config 的紧密 [f32;25] 展开成 stride=16 的 [[f32;4];25]（.x 存值）
+        let mut acc_matrix = [[0.0f32; 4]; 25];
+        for (i, v) in self.config.acc_matrix.iter().enumerate() {
+            acc_matrix[i][0] = *v;
+        }
         SimParams {
             inner_range: self.config.inner_range,
             outer_range: self.config.outer_range,
             delta_time,
             alpha: self.config.alpha,
-            acc_matrix: self.config.acc_matrix,
+            acc_matrix,
             ..Default::default()
         }
     }

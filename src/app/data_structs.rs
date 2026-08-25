@@ -56,5 +56,7 @@ pub struct SimParams {
     pub outer_range: f32,
     pub delta_time: f32,
     pub alpha: f32,
-    pub acc_matrix: [f32; 25],
+    // WGSL uniform 的 array 要求元素 stride=16，故用 [[f32;4];25]（每个 16 字节）
+    // 与 compute.wgsl 的 array<vec4f,25> 逐字节对齐；每个 [f32;4] 的 .x 存有效值。
+    pub acc_matrix: [[f32; 4]; 25],
 }
