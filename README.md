@@ -1,6 +1,10 @@
 # Life Game（粒子生命）
 
+[![Deploy to GitHub Pages](https://github.com/SovLyn/life_game/actions/workflows/pages.yml/badge.svg)](https://github.com/SovLyn/life_game/actions/workflows/pages.yml)
+
 基于 [wgpu](https://wgpu.rs) 计算着色器的粒子生命（Particle Life）模拟，使用 [egui](https://egui.rs) / eframe 构建界面，通过 [Trunk](https://trunkrs.dev) 编译为 WebAssembly，在浏览器中运行。
+
+在线体验：https://sovlyn.github.io/life_game/
 
 ## 运行
 
